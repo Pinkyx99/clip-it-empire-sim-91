@@ -1,0 +1,26 @@
+{
+  "name": "Clip It Tycoon",
+  "short_name": "ClipTycoon",
+  "description": "Build your social media empire by clipping streamers and growing your TikTok following",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1625",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/placeholder.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/placeholder.svg", 
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "lang": "en"
+}
