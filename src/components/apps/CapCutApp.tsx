@@ -1,107 +1,85 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameData } from '../../hooks/useGameData';
+import { useWindowManagerContext } from '../../contexts/WindowManagerContext';
 import { generateClipTitle } from '../../data/streamers';
-import { Play, Target, CheckCircle, XCircle, Edit } from 'lucide-react';
+import { Edit, FolderOpen, Scissors, Sparkles, Volume2, Type, Play, Save } from 'lucide-react';
 
 export const CapCutApp = () => {
-  const { gameState, addClip, setClipCooldown } = useGameData();
+  const { gameState, addClip, updateGameState } = useGameData();
+  const { openWindow } = useWindowManagerContext();
   const { currentStreamer, currentClip } = gameState;
   
-  const [isClipping, setIsClipping] = useState(false);
-  const [targetZone, setTargetZone] = useState({ start: 40, end: 60 });
-  const [linePosition, setLinePosition] = useState(0);
-  const [direction, setDirection] = useState(1);
-  const [gameResult, setGameResult] = useState<'success' | 'failed' | null>(null);
+  const [selectedVideoFile, setSelectedVideoFile] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const animationRef = useRef<number>();
+  const [editingMode, setEditingMode] = useState<'trim' | 'effects' | 'audio' | 'text' | null>(null);
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(100);
+  const [appliedEffects, setAppliedEffects] = useState<string[]>([]);
+  const [audioLevel, setAudioLevel] = useState(50);
+  const [textOverlays, setTextOverlays] = useState<Array<{id: string, text: string, position: number}>>([]);
 
   useEffect(() => {
-    if (isClipping) {
-      const animate = () => {
-        setLinePosition(prev => {
-          let newPos = prev + (direction * 1.5);
-          
-          if (newPos >= 100) {
-            newPos = 100;
-            setDirection(-1);
-          } else if (newPos <= 0) {
-            newPos = 0;
-            setDirection(1);
-          }
-          
-          return newPos;
-        });
-        
-        animationRef.current = requestAnimationFrame(animate);
-      };
-      
-      animationRef.current = requestAnimationFrame(animate);
-    } else {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+    if (currentClip && !selectedVideoFile) {
+      setSelectedVideoFile({
+        id: currentClip.id,
+        name: currentClip.title,
+        duration: currentClip.duration
+      });
+      setIsEditing(true);
     }
+  }, [currentClip]);
+
+  const handleBrowseFiles = () => {
+    openWindow('fileexplorer');
     
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+    // Listen for file selection from FileExplorer
+    const handleFileSelection = (event: any) => {
+      const file = event.detail;
+      if (file && file.type === 'video') {
+        setSelectedVideoFile(file);
+        setIsEditing(true);
+        // Close file explorer
+        // Note: This would be handled by parent window manager
       }
     };
-  }, [isClipping, direction]);
-
-  useEffect(() => {
-    // Generate random target zone
-    const start = Math.random() * 40 + 20; // 20-60
-    const end = start + 20; // 20px wide zone
-    setTargetZone({ start, end });
-  }, []);
-
-  const handleStartClipping = () => {
-    if (!currentStreamer) return;
-    setIsClipping(true);
-    setGameResult(null);
-  };
-
-  const handleClickTarget = () => {
-    if (!isClipping || !currentStreamer) return;
     
-    const isInTargetZone = linePosition >= targetZone.start && linePosition <= targetZone.end;
-    setIsClipping(false);
-    
-    if (isInTargetZone) {
-      setGameResult('success');
-      // Create clip after short delay
-      setTimeout(() => {
-        const newClip = {
-          id: `clip_${Date.now()}`,
-          streamerId: currentStreamer.id,
-          streamerName: currentStreamer.displayName,
-          title: generateClipTitle(currentStreamer.displayName),
-          duration: Math.floor(Math.random() * 30) + 15, // 15-45 seconds
-          quality: 'high' as const,
-          timestamp: Date.now()
-        };
-        addClip(newClip);
-        setIsEditing(true);
-      }, 1000);
-    } else {
-      setGameResult('failed');
-      // Set 30 second cooldown
-      setClipCooldown(Date.now() + 30000);
-      setTimeout(() => {
-        setGameResult(null);
-        setLinePosition(0);
-        setDirection(1);
-      }, 2000);
-    }
+    window.addEventListener('fileSelected', handleFileSelection);
+    return () => window.removeEventListener('fileSelected', handleFileSelection);
   };
 
   const handleFinishEditing = () => {
-    // Will trigger TikTok window opening from parent component
-    setIsEditing(false);
+    if (selectedVideoFile && isEditing) {
+      // Update the clip with editing info
+      updateGameState(prev => ({
+        ...prev,
+        currentClip: prev.currentClip ? {
+          ...prev.currentClip,
+          title: `Edited: ${prev.currentClip.title}`,
+          quality: 'high' as const
+        } : null
+      }));
+      
+      // Open TikTok
+      openWindow('tiktok');
+    }
   };
 
-  if (!currentStreamer && !currentClip) {
+  const applyEffect = (effect: string) => {
+    if (!appliedEffects.includes(effect)) {
+      setAppliedEffects(prev => [...prev, effect]);
+    }
+  };
+
+  const addTextOverlay = () => {
+    const newText = {
+      id: `text_${Date.now()}`,
+      text: 'Your text here',
+      position: Math.random() * 80 + 10
+    };
+    setTextOverlays(prev => [...prev, newText]);
+  };
+
+  if (!selectedVideoFile && !currentClip) {
     return (
       <div className="h-full bg-background">
         <div className="p-4">
@@ -111,18 +89,29 @@ export const CapCutApp = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-pink-400">CapCut</h1>
-              <p className="text-sm text-muted-foreground">Video editing made easy</p>
+              <p className="text-sm text-muted-foreground">Professional video editing</p>
             </div>
           </div>
 
           <div className="card-gaming text-center">
             <div className="app-icon bg-gradient-to-r from-pink-500 to-pink-600 mx-auto mb-4">
-              <Play className="w-8 h-8" />
+              <Edit className="w-8 h-8" />
             </div>
-            <h2 className="text-xl font-semibold mb-2">No clip to edit</h2>
-            <p className="text-muted-foreground mb-4">
-              Go to Twitch and create a clip first
-            </p>
+            <h2 className="text-xl font-semibold mb-4">Get Started</h2>
+            
+            <div className="space-y-3">
+              <button 
+                onClick={handleBrowseFiles}
+                className="w-full btn-gaming flex items-center justify-center space-x-2"
+              >
+                <FolderOpen className="w-5 h-5" />
+                <span>Browse Videos</span>
+              </button>
+              
+              <p className="text-sm text-muted-foreground">
+                Or create a clip from Twitch first
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -130,191 +119,278 @@ export const CapCutApp = () => {
   }
 
   return (
-    <div className="h-full bg-background">
-      <div className="p-4">
-        {/* Header */}
-        <div className="flex items-center space-x-4 mb-6">
-          <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg flex items-center justify-center">
-            <Edit className="w-5 h-5 text-white" />
+    <div className="h-full bg-background flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg flex items-center justify-center">
+              <Edit className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-pink-400">CapCut</h1>
+              <p className="text-sm text-muted-foreground">
+                Editing: {selectedVideoFile?.name || currentClip?.title}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-pink-400">CapCut</h1>
-            <p className="text-sm text-muted-foreground">
-              {isEditing ? 'Edit your clip' : 'Create the perfect clip'}
-            </p>
+          
+          <div className="flex items-center space-x-2">
+            <button 
+              onClick={() => setSelectedVideoFile(null)}
+              className="btn-gaming text-sm"
+            >
+              New Project
+            </button>
+            <button 
+              onClick={handleFinishEditing}
+              className="btn-viral text-sm flex items-center space-x-1"
+            >
+              <Save className="w-4 h-4" />
+              <span>Export</span>
+            </button>
           </div>
         </div>
+      </div>
 
-        {/* Clip Creation Mini-Game */}
-        {currentStreamer && !currentClip && !isEditing && (
-          <div className="space-y-6">
-            <div className="card-gaming text-center">
+      {/* Main Editing Interface */}
+      <div className="flex-1 flex">
+        {/* Video Preview */}
+        <div className="flex-1 p-4">
+          <div className="bg-black rounded-xl aspect-video mb-4 flex items-center justify-center relative overflow-hidden">
+            {currentStreamer && (
               <img 
                 src={currentStreamer.avatar} 
                 alt={currentStreamer.displayName}
-                className="w-24 h-24 rounded-xl mx-auto mb-4"
+                className="w-full h-full object-cover"
               />
-              <h2 className="text-xl font-semibold mb-2">
-                Clipping {currentStreamer.displayName}
-              </h2>
-              <p className="text-muted-foreground">
-                Click when the line is in the target zone!
-              </p>
-            </div>
-
-            {/* Timing Game */}
-            <div className="card-gaming">
-              <div className="space-y-4">
-                <div className="flex items-center justify-center space-x-2">
-                  <Target className="w-6 h-6 text-primary" />
-                  <h3 className="text-lg font-semibold">Perfect Timing</h3>
-                </div>
-
-                {/* Slider Game */}
-                <div className="relative">
-                  <div className="w-full h-16 bg-muted rounded-xl relative overflow-hidden">
-                    {/* Target Zone */}
-                    <div 
-                      className="absolute top-0 h-full bg-gradient-to-r from-success/30 to-success/50 border-2 border-success rounded"
-                      style={{
-                        left: `${targetZone.start}%`,
-                        width: `${targetZone.end - targetZone.start}%`
-                      }}
-                    />
-                    
-                    {/* Moving Line */}
-                    <div 
-                      className="absolute top-0 w-1 h-full bg-primary transition-colors duration-100"
-                      style={{
-                        left: `${linePosition}%`,
-                        backgroundColor: isClipping ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'
-                      }}
-                    />
-                  </div>
-
-                  {/* Result Indicator */}
-                  {gameResult && (
-                    <div className={`
-                      absolute inset-0 flex items-center justify-center rounded-xl
-                      ${gameResult === 'success' ? 'bg-success/20' : 'bg-destructive/20'}
-                    `}>
-                      {gameResult === 'success' ? (
-                        <CheckCircle className="w-12 h-12 text-success" />
-                      ) : (
-                        <XCircle className="w-12 h-12 text-destructive" />
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Game Button */}
-                <div className="text-center">
-                  {!isClipping && !gameResult && (
-                    <button 
-                      onClick={handleStartClipping}
-                      className="btn-gaming"
-                    >
-                      Start Clipping
-                    </button>
-                  )}
-                  
-                  {isClipping && (
-                    <button 
-                      onClick={handleClickTarget}
-                      className="btn-gaming animate-clip-pulse"
-                    >
-                      CLIP NOW!
-                    </button>
-                  )}
-
-                  {gameResult === 'success' && (
-                    <div className="text-center space-y-2">
-                      <p className="text-success font-semibold">Perfect Clip! 🎉</p>
-                      <p className="text-sm text-muted-foreground">Moving to editor...</p>
-                    </div>
-                  )}
-
-                  {gameResult === 'failed' && (
-                    <div className="text-center space-y-2">
-                      <p className="text-destructive font-semibold">Missed! 😢</p>
-                      <p className="text-sm text-muted-foreground">30 second cooldown...</p>
-                    </div>
-                  )}
-                </div>
+            )}
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="text-center text-white">
+                <Play className="w-16 h-16 mx-auto mb-2" />
+                <p className="text-lg font-semibold">Video Preview</p>
+                <p className="text-sm opacity-80">
+                  Duration: {selectedVideoFile?.duration || currentClip?.duration || 30}s
+                </p>
               </div>
             </div>
-
-            {/* Tips */}
-            <div className="card-gaming bg-primary/10 border-primary/30">
-              <h3 className="font-semibold text-primary mb-2">🎯 Clipping Tips</h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Wait for the line to enter the green zone</li>
-                <li>• Perfect timing gives better clip quality</li>
-                <li>• Failed attempts have a 30-second cooldown</li>
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* Clip Editor */}
-        {(currentClip || isEditing) && (
-          <div className="space-y-6">
-            <div className="card-gaming">
-              <h2 className="text-xl font-semibold mb-4">Edit Your Clip</h2>
-              
-              {/* Clip Preview */}
-              <div className="bg-black rounded-xl aspect-video mb-4 flex items-center justify-center">
-                <div className="text-center">
-                  <Play className="w-16 h-16 text-white/50 mx-auto mb-2" />
-                  <p className="text-white/70">
-                    {currentClip?.title || generateClipTitle(currentStreamer?.displayName || '')}
-                  </p>
-                  <p className="text-white/50 text-sm">
-                    Duration: {currentClip?.duration || Math.floor(Math.random() * 30) + 15}s
-                  </p>
-                </div>
-              </div>
-
-              {/* Simple Editing Options */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <button className="p-4 bg-muted rounded-xl hover:bg-muted/80 transition-colors">
-                  <div className="text-center">
-                    <span className="text-2xl mb-2 block">✂️</span>
-                    <p className="font-medium">Trim</p>
-                  </div>
-                </button>
-                
-                <button className="p-4 bg-muted rounded-xl hover:bg-muted/80 transition-colors">
-                  <div className="text-center">
-                    <span className="text-2xl mb-2 block">✨</span>
-                    <p className="font-medium">Effects</p>
-                  </div>
-                </button>
-                
-                <button className="p-4 bg-muted rounded-xl hover:bg-muted/80 transition-colors">
-                  <div className="text-center">
-                    <span className="text-2xl mb-2 block">🎵</span>
-                    <p className="font-medium">Audio</p>
-                  </div>
-                </button>
-                
-                <button className="p-4 bg-muted rounded-xl hover:bg-muted/80 transition-colors">
-                  <div className="text-center">
-                    <span className="text-2xl mb-2 block">💬</span>
-                    <p className="font-medium">Text</p>
-                  </div>
-                </button>
-              </div>
-
-              <button 
-                onClick={handleFinishEditing}
-                className="w-full btn-gaming"
+            
+            {/* Text Overlays Preview */}
+            {textOverlays.map((overlay) => (
+              <div 
+                key={overlay.id}
+                className="absolute text-white font-bold text-lg"
+                style={{
+                  top: `${overlay.position}%`,
+                  left: '50%',
+                  transform: 'translateX(-50%)'
+                }}
               >
-                Finish Editing
-              </button>
+                {overlay.text}
+              </div>
+            ))}
+          </div>
+
+          {/* Timeline */}
+          <div className="card-gaming">
+            <h3 className="font-semibold mb-3">Timeline</h3>
+            <div className="space-y-3">
+              {/* Trim Controls */}
+              {editingMode === 'trim' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Trim Start: {trimStart}%</label>
+                  <input 
+                    type="range" 
+                    value={trimStart} 
+                    onChange={(e) => setTrimStart(Number(e.target.value))}
+                    max={trimEnd - 5}
+                    className="w-full"
+                  />
+                  <label className="text-sm font-medium">Trim End: {trimEnd}%</label>
+                  <input 
+                    type="range" 
+                    value={trimEnd} 
+                    onChange={(e) => setTrimEnd(Number(e.target.value))}
+                    min={trimStart + 5}
+                    className="w-full"
+                  />
+                </div>
+              )}
+
+              {/* Audio Controls */}
+              {editingMode === 'audio' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Audio Level: {audioLevel}%</label>
+                  <input 
+                    type="range" 
+                    value={audioLevel} 
+                    onChange={(e) => setAudioLevel(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex space-x-2">
+                    <button className="btn-gaming text-sm">Add Music</button>
+                    <button className="btn-gaming text-sm">Remove Audio</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Video Timeline Bar */}
+              <div className="relative w-full h-16 bg-muted rounded-lg overflow-hidden">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full h-8 bg-gradient-to-r from-blue-400 to-blue-600 rounded mx-2">
+                    <div className="h-full flex items-center justify-center text-white text-xs font-medium">
+                      Video Track
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Trim indicators */}
+                <div 
+                  className="absolute top-0 h-full w-1 bg-yellow-400"
+                  style={{ left: `${trimStart}%` }}
+                />
+                <div 
+                  className="absolute top-0 h-full w-1 bg-yellow-400"
+                  style={{ left: `${trimEnd}%` }}
+                />
+              </div>
             </div>
           </div>
-        )}
+        </div>
+
+        {/* Editing Tools Sidebar */}
+        <div className="w-80 border-l border-border bg-muted/20 p-4">
+          <h3 className="font-semibold mb-4">Editing Tools</h3>
+          
+          <div className="space-y-3">
+            {/* Trim Tool */}
+            <button 
+              onClick={() => setEditingMode(editingMode === 'trim' ? null : 'trim')}
+              className={`w-full p-4 rounded-xl transition-all ${
+                editingMode === 'trim' 
+                  ? 'bg-primary/20 border-primary/30 border' 
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Scissors className="w-6 h-6 text-primary" />
+                <div className="text-left">
+                  <p className="font-medium">Trim</p>
+                  <p className="text-sm text-muted-foreground">Cut video length</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Effects Tool */}
+            <button 
+              onClick={() => setEditingMode(editingMode === 'effects' ? null : 'effects')}
+              className={`w-full p-4 rounded-xl transition-all ${
+                editingMode === 'effects' 
+                  ? 'bg-primary/20 border-primary/30 border' 
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Sparkles className="w-6 h-6 text-purple-400" />
+                <div className="text-left">
+                  <p className="font-medium">Effects</p>
+                  <p className="text-sm text-muted-foreground">Add visual effects</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Effects Panel */}
+            {editingMode === 'effects' && (
+              <div className="ml-4 space-y-2">
+                {['Blur', 'Slow Motion', 'Speed Up', 'Color Filter'].map((effect) => (
+                  <button 
+                    key={effect}
+                    onClick={() => applyEffect(effect)}
+                    className={`w-full p-2 text-sm rounded-lg transition-all ${
+                      appliedEffects.includes(effect)
+                        ? 'bg-success/20 text-success'
+                        : 'bg-background hover:bg-muted'
+                    }`}
+                  >
+                    {effect} {appliedEffects.includes(effect) ? '✓' : ''}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Audio Tool */}
+            <button 
+              onClick={() => setEditingMode(editingMode === 'audio' ? null : 'audio')}
+              className={`w-full p-4 rounded-xl transition-all ${
+                editingMode === 'audio' 
+                  ? 'bg-primary/20 border-primary/30 border' 
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Volume2 className="w-6 h-6 text-green-400" />
+                <div className="text-left">
+                  <p className="font-medium">Audio</p>
+                  <p className="text-sm text-muted-foreground">Edit sound</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Text Tool */}
+            <button 
+              onClick={() => setEditingMode(editingMode === 'text' ? null : 'text')}
+              className={`w-full p-4 rounded-xl transition-all ${
+                editingMode === 'text' 
+                  ? 'bg-primary/20 border-primary/30 border' 
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <Type className="w-6 h-6 text-yellow-400" />
+                <div className="text-left">
+                  <p className="font-medium">Text</p>
+                  <p className="text-sm text-muted-foreground">Add captions</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Text Panel */}
+            {editingMode === 'text' && (
+              <div className="ml-4 space-y-2">
+                <button 
+                  onClick={addTextOverlay}
+                  className="w-full p-2 bg-primary/20 text-primary rounded-lg text-sm"
+                >
+                  + Add Text
+                </button>
+                {textOverlays.map((overlay) => (
+                  <div key={overlay.id} className="p-2 bg-background rounded text-sm">
+                    <input 
+                      type="text" 
+                      value={overlay.text}
+                      onChange={(e) => setTextOverlays(prev => 
+                        prev.map(t => t.id === overlay.id ? {...t, text: e.target.value} : t)
+                      )}
+                      className="w-full p-1 bg-muted rounded text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Applied Effects Summary */}
+          {appliedEffects.length > 0 && (
+            <div className="mt-6 p-3 bg-success/10 border border-success/30 rounded-lg">
+              <h4 className="font-medium text-success mb-2">Applied Effects:</h4>
+              <div className="space-y-1">
+                {appliedEffects.map((effect, index) => (
+                  <div key={index} className="text-sm text-success">• {effect}</div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

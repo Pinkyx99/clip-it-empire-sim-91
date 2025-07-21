@@ -7,7 +7,8 @@ import { TwitchApp } from '../components/apps/TwitchApp';
 import { CapCutApp } from '../components/apps/CapCutApp';
 import { TikTokApp } from '../components/apps/TikTokApp';
 import { WhopApp } from '../components/apps/WhopApp';
-import { Tv, Edit, Camera, ShoppingBag } from 'lucide-react';
+import { FileExplorerApp } from '../components/apps/FileExplorerApp';
+import { Tv, Edit, Camera, ShoppingBag, FolderOpen } from 'lucide-react';
 
 const IndexContent = () => {
   const { gameState } = useGameData();
@@ -86,6 +87,20 @@ const IndexContent = () => {
         onFocus={() => focusWindow('whop')}
       >
         <WhopApp />
+      </Window>
+
+      <Window
+        id="fileexplorer"
+        title="File Explorer"
+        icon={<FolderOpen className="w-4 h-4" />}
+        isOpen={getWindow('fileexplorer')?.isOpen || false}
+        isMinimized={getWindow('fileexplorer')?.isMinimized || false}
+        zIndex={getWindow('fileexplorer')?.zIndex || 1}
+        onClose={() => closeWindow('fileexplorer')}
+        onMinimize={() => minimizeWindow('fileexplorer')}
+        onFocus={() => focusWindow('fileexplorer')}
+      >
+        <FileExplorerApp />
       </Window>
     </div>
   );
