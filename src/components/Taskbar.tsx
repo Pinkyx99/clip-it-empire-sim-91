@@ -1,9 +1,9 @@
-import { useWindowManager } from '../hooks/useWindowManager';
+import { useWindowManagerContext } from '../contexts/WindowManagerContext';
 import { useGameData } from '../hooks/useGameData';
 import { Tv, Edit, Camera, ShoppingBag, Clock } from 'lucide-react';
 
 export const Taskbar = () => {
-  const { getOpenWindows, restoreWindow, focusWindow } = useWindowManager();
+  const { getOpenWindows, restoreWindow, focusWindow } = useWindowManagerContext();
   const { gameState } = useGameData();
   const openWindows = getOpenWindows();
 

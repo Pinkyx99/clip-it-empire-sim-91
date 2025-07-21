@@ -1,9 +1,9 @@
-import { useWindowManager } from '../hooks/useWindowManager';
+import { useWindowManagerContext } from '../contexts/WindowManagerContext';
 import { useGameData } from '../hooks/useGameData';
 import { Tv, Edit, Camera, ShoppingBag, Home, Trophy, Gift } from 'lucide-react';
 
 export const Desktop = () => {
-  const { openWindow } = useWindowManager();
+  const { openWindow } = useWindowManagerContext();
   const { gameState, claimDailyBonus } = useGameData();
   const { player } = gameState;
 

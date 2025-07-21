@@ -1,4 +1,4 @@
-import { useWindowManager } from '../hooks/useWindowManager';
+import { WindowManagerProvider, useWindowManagerContext } from '../contexts/WindowManagerContext';
 import { useGameData } from '../hooks/useGameData';
 import { Desktop } from '../components/Desktop';
 import { Taskbar } from '../components/Taskbar';
@@ -9,9 +9,9 @@ import { TikTokApp } from '../components/apps/TikTokApp';
 import { WhopApp } from '../components/apps/WhopApp';
 import { Tv, Edit, Camera, ShoppingBag } from 'lucide-react';
 
-const Index = () => {
+const IndexContent = () => {
   const { gameState } = useGameData();
-  const { windows, openWindow, closeWindow, minimizeWindow, focusWindow, getWindow } = useWindowManager();
+  const { windows, openWindow, closeWindow, minimizeWindow, focusWindow, getWindow } = useWindowManagerContext();
 
   // Auto-open windows based on game flow
   const handleStreamerSelected = () => {
@@ -88,6 +88,14 @@ const Index = () => {
         <WhopApp />
       </Window>
     </div>
+  );
+};
+
+const Index = () => {
+  return (
+    <WindowManagerProvider>
+      <IndexContent />
+    </WindowManagerProvider>
   );
 };
 
